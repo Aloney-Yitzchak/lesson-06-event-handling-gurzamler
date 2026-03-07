@@ -1,0 +1,266 @@
+name: GitHub Classroom Autograding - Lesson 06 Event Handling
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # JOB 1: Static Code Analysis (Fast — ~30 seconds)
+  # ─────────────────────────────────────────────────
+  static-checks:
+    name: "🔍 Static Code Checks"
+    runs-on: ubuntu-latest
+    outputs:
+      score: ${{ steps.calculate.outputs.score }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "📁 Check 1 — MainActivity.java exists"
+        id: check_file
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+          if [ -f "$FILE" ]; then
+            echo "✅ PASS: MainActivity.java found"
+            echo "check_file=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: MainActivity.java not found at $FILE"
+            echo "check_file=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "🔗 Check 2 — Variables declared (EditText, Button, TextView)"
+        id: check_vars
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+          PASS=true
+
+          grep -q "EditText" "$FILE" || { echo "❌ FAIL: No EditText variable declared"; PASS=false; }
+          grep -q "Button" "$FILE"   || { echo "❌ FAIL: No Button variable declared"; PASS=false; }
+          grep -q "TextView" "$FILE" || { echo "❌ FAIL: No TextView variable declared"; PASS=false; }
+
+          if [ "$PASS" = "true" ]; then
+            echo "✅ PASS: EditText, Button, and TextView are declared"
+            echo "check_vars=pass" >> $GITHUB_OUTPUT
+          else
+            echo "check_vars=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "🔌 Check 3 — findViewById used for View binding"
+        id: check_findviewbyid
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+          COUNT=$(grep -c "findViewById" "$FILE" || true)
+
+          if [ "$COUNT" -ge 3 ]; then
+            echo "✅ PASS: Found $COUNT findViewById calls (need ≥ 3)"
+            echo "check_findviewbyid=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: Only $COUNT findViewById call(s) found — need at least 3 (EditText + 2 Buttons)"
+            echo "check_findviewbyid=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "👆 Check 4 — OnClickListener or lambda click handler present"
+        id: check_click
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+
+          # Accept both setOnClickListener and lambda-style view.OnClickListener
+          if grep -qE "setOnClickListener|OnClickListener" "$FILE"; then
+            COUNT=$(grep -c "setOnClickListener" "$FILE" || true)
+            echo "✅ PASS: Found click listener(s) — $COUNT setOnClickListener call(s)"
+            echo "check_click=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: No click listener found — implement setOnClickListener on your buttons"
+            echo "check_click=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "📝 Check 5 — getText().toString() used to read input"
+        id: check_gettext
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+
+          if grep -qE "getText\\(\\)|getText\\(\\)\\.toString" "$FILE"; then
+            echo "✅ PASS: getText() found — EditText input is being read"
+            echo "check_gettext=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: getText() not found — you need to read the user's input from the EditText"
+            echo "check_gettext=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "📺 Check 6 — setText() used to display result"
+        id: check_settext
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+
+          if grep -qE "setText\\(" "$FILE"; then
+            COUNT=$(grep -c "setText" "$FILE" || true)
+            echo "✅ PASS: setText() found ($COUNT call(s)) — result is being displayed"
+            echo "check_settext=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: setText() not found — you need to show the greeting in the TextView"
+            echo "check_settext=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "🧹 Check 7 — Clear button resets fields (empty string or clear)"
+        id: check_clear
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+
+          # Look for empty string set (clearing) or .clear() or .setText("")
+          if grep -qE 'setText\(""\)|setText\(getString\(R\.string\.empty\)\)|\.getText\(\)\.clear\(\)' "$FILE"; then
+            echo "✅ PASS: Clear button resets fields"
+            echo "check_clear=pass" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  WARN: Could not detect field clearing — make sure your 'נקה' button resets EditText and TextView"
+            echo "check_clear=warn" >> $GITHUB_OUTPUT
+            # Don't fail — student might use a valid alternative
+          fi
+
+      - name: "💬 Check 8 — Greeting message contains student's name"
+        id: check_greeting
+        run: |
+          FILE="app/src/main/java/com/example/template/MainActivity.java"
+
+          # Look for string concatenation with the name variable
+          if grep -qE '"\u05e9\u05dc\u05d5\u05dd|"Hello|"Shalom|\+ name|\+ userName|editText.*getText|getString' "$FILE"; then
+            echo "✅ PASS: Greeting appears to include the user's name"
+            echo "check_greeting=pass" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  WARN: Cannot confirm greeting message includes the user name — verify this manually"
+            echo "check_greeting=warn" >> $GITHUB_OUTPUT
+            # Don't fail — static analysis is limited here
+          fi
+
+      - name: "📓 Check 9 — OBSERVATIONS.md is filled out"
+        id: check_observations
+        run: |
+          if [ ! -f "OBSERVATIONS.md" ]; then
+            echo "❌ FAIL: OBSERVATIONS.md not found"
+            echo "check_observations=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          LINES=$(grep -v "^#\\|^$\\|^-\\s*$\\|^\\s*$\\|^<!--" OBSERVATIONS.md | wc -l | tr -d ' ')
+          if [ "$LINES" -ge 3 ]; then
+            echo "✅ PASS: OBSERVATIONS.md has content ($LINES non-empty lines)"
+            echo "check_observations=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: OBSERVATIONS.md appears mostly empty ($LINES content lines found — need ≥ 3)"
+            echo "check_observations=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "❓ Check 10 — QUESTIONS.md is filled out"
+        id: check_questions
+        run: |
+          if [ ! -f "QUESTIONS.md" ]; then
+            echo "❌ FAIL: QUESTIONS.md not found"
+            echo "check_questions=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          LINES=$(grep -v "^#\\|^$\\|^-\\s*$\\|^\\s*$\\|^<!--" QUESTIONS.md | wc -l | tr -d ' ')
+          if [ "$LINES" -ge 2 ]; then
+            echo "✅ PASS: QUESTIONS.md has content ($LINES non-empty lines)"
+            echo "check_questions=pass" >> $GITHUB_OUTPUT
+          else
+            echo "❌ FAIL: QUESTIONS.md appears mostly empty ($LINES content lines found — need ≥ 2)"
+            echo "check_questions=fail" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: "📊 Calculate score"
+        id: calculate
+        if: always()
+        run: |
+          SCORE=0
+          [ "${{ steps.check_file.outputs.check_file }}" = "pass" ]             && SCORE=$((SCORE+10))
+          [ "${{ steps.check_vars.outputs.check_vars }}" = "pass" ]             && SCORE=$((SCORE+15))
+          [ "${{ steps.check_findviewbyid.outputs.check_findviewbyid }}" = "pass" ] && SCORE=$((SCORE+15))
+          [ "${{ steps.check_click.outputs.check_click }}" = "pass" ]           && SCORE=$((SCORE+20))
+          [ "${{ steps.check_gettext.outputs.check_gettext }}" = "pass" ]       && SCORE=$((SCORE+10))
+          [ "${{ steps.check_settext.outputs.check_settext }}" = "pass" ]       && SCORE=$((SCORE+10))
+          [ "${{ steps.check_observations.outputs.check_observations }}" = "pass" ] && SCORE=$((SCORE+10))
+          [ "${{ steps.check_questions.outputs.check_questions }}" = "pass" ]   && SCORE=$((SCORE+10))
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "📊 Static analysis score: $SCORE / 100"
+
+  # ─────────────────────────────────────────────────
+  # JOB 2: Gradle Build Check (slower — ~5 min)
+  # ─────────────────────────────────────────────────
+  build-check:
+    name: "🔨 Build Check (Gradle)"
+    runs-on: ubuntu-latest
+    needs: static-checks
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "☕ Set up JDK 17"
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: "📱 Set up Android SDK"
+        uses: android-actions/setup-android@v3
+
+      - name: "🔑 Make gradlew executable"
+        run: chmod +x ./gradlew
+
+      - name: "🏗️ Build debug APK"
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
+
+      - name: "✅ Build succeeded"
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            SIZE=$(du -sh "$APK" | cut -f1)
+            echo "✅ APK built successfully: $APK ($SIZE)"
+          else
+            echo "⚠️ Build ran but APK not found in expected location"
+          fi
+
+  # ─────────────────────────────────────────────────
+  # JOB 3: Summary Report
+  # ─────────────────────────────────────────────────
+  summary:
+    name: "📋 Grading Summary"
+    runs-on: ubuntu-latest
+    needs: [static-checks, build-check]
+    if: always()
+
+    steps:
+      - name: "📋 Print final summary"
+        run: |
+          echo "================================================"
+          echo "   Lesson 06 — Event Handling — Grading Report"
+          echo "================================================"
+          echo ""
+          echo "Static Analysis Score: ${{ needs.static-checks.outputs.score }} / 100"
+          echo ""
+          echo "Build status: ${{ needs.build-check.result }}"
+          echo ""
+          if [ "${{ needs.build-check.result }}" = "success" ]; then
+            echo "✅ Code compiles successfully!"
+          else
+            echo "❌ Build failed — check the Build Check job for errors"
+          fi
+          echo ""
+          echo "================================================"
+          echo "Note: Final grade is determined by your teacher."
+          echo "This is automatic feedback to help you improve."
+          echo "================================================"
